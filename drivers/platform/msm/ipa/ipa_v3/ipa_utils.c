@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022, 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <net/ip.h>
@@ -5795,6 +5795,14 @@ static const struct ipa_ep_configuration ipa3_ep_mapping
 			{ 6, 16, 8, 16, IPA_EE_AP, GSI_SMART_PRE_FETCH, 2},
 			IPA_TX_INSTANCE_NA },
 
+	[IPA_5_5_XR][IPA_CLIENT_USB_PROD] = {
+			true, IPA_v5_5_GROUP_UL,
+			true,
+			IPA_DPS_HPS_SEQ_TYPE_2ND_PKT_PROCESS_PASS_NO_DEC_UCP,
+			QMB_MASTER_SELECT_DDR,
+			{ 1, 0, 8, 16, IPA_EE_AP, GSI_ESCAPE_BUF_ONLY, 0},
+			IPA_TX_INSTANCE_NA },
+
 	[IPA_5_5_XR][IPA_CLIENT_APPS_LAN_CONS] = {
 			true, IPA_v5_5_GROUP_DL,
 			false,
@@ -5842,6 +5850,14 @@ static const struct ipa_ep_configuration ipa3_ep_mapping
 			QMB_MASTER_SELECT_DDR,
 			{ 34, 5, 9, 9, IPA_EE_UC, GSI_SMART_PRE_FETCH, 3},
 			IPA_TX_INSTANCE_DL},
+
+	[IPA_5_5_XR][IPA_CLIENT_USB_CONS] = {
+			true, IPA_v5_5_GROUP_DL,
+			false,
+			IPA_DPS_HPS_SEQ_TYPE_INVALID,
+			QMB_MASTER_SELECT_DDR,
+			{ 27, 26, 9, 9, IPA_EE_AP, GSI_SMART_PRE_FETCH, 3},
+			IPA_TX_INSTANCE_DL },
 };
 
 static struct ipa3_mem_partition ipa_3_0_mem_part = {
@@ -8521,7 +8537,7 @@ int ipa3_cfg_ep(u32 clnt_hdl, const struct ipa_ep_cfg *ipa_ep_cfg)
 	if (result)
 		return result;
 
-	if (ipa3_is_ulso_supported()) {
+	if (ipa3_is_ulso_supported() && ipa_ep_cfg->ulso.is_ulso_pipe) {
 		result = ipa3_cfg_ep_ulso(clnt_hdl,
 			&ipa_ep_cfg->ulso);
 		if (result)
@@ -8743,7 +8759,6 @@ void ipa3_cfg_ep_cfg_pipe_replicate(u32 clnt_hdl)
 		case IPA_CLIENT_APPS_WAN_PROD:
 		case IPA_CLIENT_WLAN2_PROD:
 		case IPA_CLIENT_WIGIG_PROD:
-		case IPA_CLIENT_APPS_LAN_PROD:
 		case IPA_CLIENT_APPS_WAN_LOW_LAT_DATA_PROD:
 		case IPA_CLIENT_APPS_LAN_COAL_CONS:
 		case IPA_CLIENT_APPS_LAN_CONS:
@@ -9246,8 +9261,10 @@ const char *ipa3_get_aggr_enable_str(enum ipa_aggr_en_type aggr_en)
 const char *ipa3_get_aggr_type_str(enum ipa_aggr_type aggr_type)
 {
 	switch (aggr_type) {
+	case (IPA_NCM_16):
+		return "NCM_16";
 	case (IPA_MBIM_16):
-			return "MBIM_16";
+		return "MBIM_16";
 	case (IPA_HDLC):
 		return "HDLC";
 	case (IPA_TLP):
@@ -12324,7 +12341,8 @@ static int __ipa_stop_gsi_channel(u32 clnt_hdl)
 	if (ipa3_ctx->ipa_hw_type >= IPA_HW_v4_5 &&
 		ipa3_ctx->ipa_hw_type != IPA_HW_v4_7 &&
 		ipa3_ctx->ipa_hw_type != IPA_HW_v4_11 &&
-		ipa3_ctx->ipa_hw_type != IPA_HW_v5_2) {
+		ipa3_ctx->ipa_hw_type != IPA_HW_v5_2 &&
+		ipa3_ctx->platform_type != IPA_PLAT_TYPE_XR) {
 		switch (client_type) {
 		case IPA_CLIENT_MHI_PRIME_TETH_PROD:
 			gsi_info = &ipa3_ctx->gsi_info[IPA_HW_PROTOCOL_MHIP];
@@ -12512,9 +12530,9 @@ static int _ipa_suspend_resume_pipe(enum ipa_client_type client, bool suspend)
 
 	if (IPA_CLIENT_IS_APPS_PROD(client) ||
 		(client == IPA_CLIENT_APPS_WAN_CONS &&
-		 IPA_CLIENT_IS_MAPPED(IPA_CLIENT_APPS_WAN_COAL_CONS, wan_coal_ep_idx)) ||
+		 IPA_CLIENT_IS_MAPPED_VALID(IPA_CLIENT_APPS_WAN_COAL_CONS, wan_coal_ep_idx)) ||
 		(client == IPA_CLIENT_APPS_LAN_CONS &&
-		 IPA_CLIENT_IS_MAPPED(IPA_CLIENT_APPS_LAN_COAL_CONS, lan_coal_ep_idx)))
+		 IPA_CLIENT_IS_MAPPED_VALID(IPA_CLIENT_APPS_LAN_COAL_CONS, lan_coal_ep_idx)))
 		return 0;
 
 	if (suspend) {
